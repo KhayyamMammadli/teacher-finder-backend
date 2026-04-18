@@ -1,9 +1,22 @@
 const { Pool } = require("pg");
 
+function stripSslModeFromConnectionString(connectionString) {
+  try {
+    const parsed = new URL(connectionString);
+    parsed.searchParams.delete("sslmode");
+    return parsed.toString();
+  } catch (err) {
+    console.warn("[db] DATABASE_URL could not be parsed as URL. Using it as-is.");
+    return connectionString;
+  }
+}
+
 function getPoolConfig() {
   if (process.env.DATABASE_URL) {
+    const connectionString = stripSslModeFromConnectionString(process.env.DATABASE_URL);
+
     return {
-      connectionString: process.env.DATABASE_URL,
+      connectionString,
       ssl: { rejectUnauthorized: false },
     };
   }
