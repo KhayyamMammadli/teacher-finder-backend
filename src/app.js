@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
+const { query } = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const teacherRoutes = require('./routes/teacherRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
@@ -8,10 +9,31 @@ const profileRoutes = require('./routes/profileRoutes');
 
 const app = express();
 
-const corsOrigin = process.env.CORS_ORIGIN || '*';
+function getAllowedOrigins() {
+  const rawOrigins = process.env.CORS_ORIGIN;
+
+  if (!rawOrigins) {
+    return '*';
+  }
+
+  const origins = rawOrigins
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return origins.length ? origins : '*';
+}
+
+const allowedOrigins = getAllowedOrigins();
 
 app.use(cors({
-  origin: corsOrigin,
+  origin(origin, callback) {
+    if (allowedOrigins === '*' || !origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS origin is not allowed: ${origin}`));
+  },
 }));
 app.use(express.json());
 
@@ -20,6 +42,19 @@ app.get('/', (req, res) => {
     message: 'Teacher Finder API works',
     version: '1.0.0',
   });
+});
+
+app.get('/health', async (req, res, next) => {
+  try {
+    await query('select 1 as ok');
+
+    return res.json({
+      status: 'ok',
+      database: 'connected',
+    });
+  } catch (err) {
+    return next(err);
+  }
 });
 
 app.use('/api/auth', authRoutes);
