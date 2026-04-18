@@ -32,7 +32,7 @@ function withDistance(item, lat, lng) {
 }
 
 async function listTeachers(req, res) {
-  const { subject, minPrice, maxPrice, rating, location, lat, lng } = req.query;
+  const { subject, minPrice, maxPrice, rating, location, lat, lng, radiusKm } = req.query;
 
   const parsedLat = Number(lat);
   const parsedLng = Number(lng);
@@ -69,15 +69,32 @@ async function listTeachers(req, res) {
   const teacherRows = await query(`select * from teachers ${whereSql}`, params);
 
   let result = teacherRows.rows.map((row) => withDistance(mapTeacher(row), parsedLat, parsedLng));
+  const effectiveRadiusKm = Number(radiusKm) > 0 ? Number(radiusKm) : 10;
 
   result.sort((a, b) => {
     if (a.distanceKm !== null && b.distanceKm !== null) {
+      const aNearby = a.distanceKm <= effectiveRadiusKm ? 0 : 1;
+      const bNearby = b.distanceKm <= effectiveRadiusKm ? 0 : 1;
+
+      if (aNearby !== bNearby) {
+        return aNearby - bNearby;
+      }
+
       return a.distanceKm - b.distanceKm;
     }
+
+    if (a.distanceKm !== null) {
+      return -1;
+    }
+
+    if (b.distanceKm !== null) {
+      return 1;
+    }
+
     return b.rating - a.rating;
   });
 
-  return res.json({ items: result, total: result.length });
+  return res.json({ items: result, total: result.length, radiusKm: effectiveRadiusKm });
 }
 
 async function getTopTeachers(req, res) {

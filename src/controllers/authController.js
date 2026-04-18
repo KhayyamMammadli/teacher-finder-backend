@@ -5,6 +5,7 @@ const { JWT_SECRET, JWT_EXPIRES_IN } = require("../config/constants");
 const { query } = require("../config/db");
 const { createId } = require("../utils/id");
 const { sendOtpMail } = require("../utils/mailer");
+const { ensureTeacherRegistrationTable } = require("../utils/teacherRegistration");
 
 function toAuthResponse(user) {
   const token = jwt.sign({ sub: user.id, role: user.role }, JWT_SECRET, {
@@ -35,6 +36,15 @@ async function sendRegisterOtp(req, res) {
   const exists = await query("select id from users where lower(email) = $1", [normalizedEmail]);
   if (exists.rowCount) {
     return res.status(409).json({ message: "Bu email artiq qeydiyyatdadir" });
+  }
+
+  await ensureTeacherRegistrationTable();
+  const pendingRegistration = await query(
+    "select id from teacher_registration_requests where lower(email) = $1 and status = 'pending' limit 1",
+    [normalizedEmail]
+  );
+  if (pendingRegistration.rowCount) {
+    return res.status(409).json({ message: "Bu email ucun muellim muracieti artiq baxisdadir" });
   }
 
   const otpCode = String(randomInt(100000, 999999));
@@ -91,34 +101,56 @@ async function verifyRegisterOtp(req, res) {
     return res.status(400).json({ message: "OTP yanlisdir" });
   }
 
+  if (role === "teacher") {
+    await ensureTeacherRegistrationTable();
+    const passwordHash = await bcrypt.hash(password, 10);
+    const requestId = createId("tr");
+
+    const existingRequest = await query(
+      "select id from teacher_registration_requests where lower(email) = $1 order by requested_at desc limit 1",
+      [normalizedEmail]
+    );
+
+    if (existingRequest.rowCount) {
+      await query(
+        `update teacher_registration_requests
+         set name = $2,
+             password_hash = $3,
+             phone = $4,
+             status = 'pending',
+             rejection_reason = null,
+             rejected_at = null,
+             rejected_by = null,
+             approved_at = null,
+             approved_by = null,
+             requested_at = now(),
+             updated_at = now()
+         where id = $1`,
+        [existingRequest.rows[0].id, name, passwordHash, phone || ""]
+      );
+    } else {
+      await query(
+        `insert into teacher_registration_requests
+         (id, name, email, password_hash, phone, status, requested_role, requested_at, updated_at)
+         values ($1, $2, $3, $4, $5, 'pending', 'teacher', now(), now())`,
+        [requestId, name, normalizedEmail, passwordHash, phone || ""]
+      );
+    }
+
+    await query("update email_otps set consumed = true where id = $1", [otpRow.id]);
+
+    return res.status(202).json({
+      message: "Muellim muracietiniz admin paneline gonderildi. Tesdiqden sonra daxil ola bilersiniz.",
+      status: "pending_admin_approval",
+    });
+  }
+
   const passwordHash = await bcrypt.hash(password, 10);
   const id = createId("u");
-  let teacherId = null;
-
-  if (role === "teacher") {
-    teacherId = createId("t");
-    await query(
-      "insert into teachers (id, name, image, subject, subjects, rating, price, location, lat, lng, experience_years, bio) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
-      [
-        teacherId,
-        name,
-        "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=600",
-        "General",
-        [],
-        0,
-        0,
-        "Baku",
-        40.4093,
-        49.8671,
-        0,
-        "Yeni muellim profili",
-      ]
-    );
-  }
 
   const userInsert = await query(
     "insert into users (id, role, teacher_id, name, email, password_hash, phone) values ($1,$2,$3,$4,$5,$6,$7) returning id, role, teacher_id, name, email, phone",
-    [id, role, teacherId, name, normalizedEmail, passwordHash, phone || ""]
+    [id, role, null, name, normalizedEmail, passwordHash, phone || ""]
   );
 
   await query("update email_otps set consumed = true where id = $1", [otpRow.id]);
@@ -134,6 +166,16 @@ async function login(req, res) {
 
   const result = await query("select * from users where lower(email) = $1", [String(email).toLowerCase()]);
   if (!result.rowCount) {
+    await ensureTeacherRegistrationTable();
+    const pending = await query(
+      "select id from teacher_registration_requests where lower(email) = $1 and status = 'pending' limit 1",
+      [String(email).toLowerCase()]
+    );
+
+    if (pending.rowCount) {
+      return res.status(403).json({ message: "Muellim muracietiniz hələ admin terefinden tesdiqlenmeyib" });
+    }
+
     return res.status(401).json({ message: "Email ve ya sifre sehvdir" });
   }
 
