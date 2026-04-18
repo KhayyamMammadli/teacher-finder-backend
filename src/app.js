@@ -27,6 +27,24 @@ app.use('/api/teachers', teacherRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/profile', profileRoutes);
 
+app.use((err, req, res, next) => {
+  if (!err) {
+    return next();
+  }
+
+  if (err.code === 'ECONNREFUSED') {
+    return res.status(503).json({
+      message: 'Database connection failed. Check DATABASE_URL (or PGHOST/PGPORT) and ensure PostgreSQL is running.',
+      details: err.message,
+    });
+  }
+
+  return res.status(500).json({
+    message: 'Internal server error',
+    details: err.message,
+  });
+});
+
 app.use((req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
