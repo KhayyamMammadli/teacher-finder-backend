@@ -1,43 +1,50 @@
-const { users } = require("../data/mockData");
+const { query } = require("../config/db");
 
-function getMyProfile(req, res) {
-  const user = users.find((u) => u.id === req.user.id);
-  if (!user) {
-    return res.status(404).json({ message: "User not found" });
-  }
-
-  return res.json({
-    id: user.id,
-    role: user.role,
-    name: user.name,
-    email: user.email,
-    phone: user.phone,
-    teacherId: user.teacherId,
-  });
+function mapProfile(row) {
+  return {
+    id: row.id,
+    role: row.role,
+    name: row.name,
+    email: row.email,
+    phone: row.phone,
+    teacherId: row.teacher_id,
+  };
 }
 
-function updateMyProfile(req, res) {
-  const user = users.find((u) => u.id === req.user.id);
-  if (!user) {
+async function getMyProfile(req, res) {
+  const result = await query("select id, role, name, email, phone, teacher_id from users where id = $1", [
+    req.user.id,
+  ]);
+
+  if (!result.rowCount) {
     return res.status(404).json({ message: "User not found" });
   }
 
-  const { name, phone } = req.body;
-  if (typeof name === "string" && name.trim()) {
-    user.name = name.trim();
-  }
-  if (typeof phone === "string") {
-    user.phone = phone.trim();
+  return res.json(mapProfile(result.rows[0]));
+}
+
+async function updateMyProfile(req, res) {
+  const existing = await query("select id, role, name, email, phone, teacher_id from users where id = $1", [
+    req.user.id,
+  ]);
+
+  if (!existing.rowCount) {
+    return res.status(404).json({ message: "User not found" });
   }
 
-  return res.json({
-    id: user.id,
-    role: user.role,
-    name: user.name,
-    email: user.email,
-    phone: user.phone,
-    teacherId: user.teacherId,
-  });
+  const current = existing.rows[0];
+  const { name, phone } = req.body;
+
+  const updated = await query(
+    "update users set name = $1, phone = $2 where id = $3 returning id, role, name, email, phone, teacher_id",
+    [
+      typeof name === "string" && name.trim() ? name.trim() : current.name,
+      typeof phone === "string" ? phone.trim() : current.phone,
+      req.user.id,
+    ]
+  );
+
+  return res.json(mapProfile(updated.rows[0]));
 }
 
 module.exports = {

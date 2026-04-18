@@ -1,51 +1,66 @@
-const { bookings, teachers } = require("../data/mockData");
+const { query } = require("../config/db");
+const { createId } = require("../utils/id");
 
-function listBookings(req, res) {
+async function listBookings(req, res) {
   if (req.user.role === "student") {
-    const mine = bookings.filter((b) => b.studentId === req.user.id);
-    return res.json({ items: mine });
+    const result = await query(
+      "select id, student_id, teacher_id, note, status, created_at from bookings where student_id = $1 order by created_at desc",
+      [req.user.id]
+    );
+    return res.json({ items: result.rows.map(mapBooking) });
   }
 
   if (req.user.role === "teacher") {
-    const mine = bookings.filter((b) => b.teacherId === req.user.teacherId);
-    return res.json({ items: mine });
+    const result = await query(
+      "select id, student_id, teacher_id, note, status, created_at from bookings where teacher_id = $1 order by created_at desc",
+      [req.user.teacherId]
+    );
+    return res.json({ items: result.rows.map(mapBooking) });
   }
 
   return res.json({ items: [] });
 }
 
-function createBooking(req, res) {
+function mapBooking(row) {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    teacherId: row.teacher_id,
+    note: row.note,
+    status: row.status,
+    createdAt: row.created_at,
+  };
+}
+
+async function createBooking(req, res) {
   const { teacherId, note } = req.body;
 
   if (!teacherId) {
     return res.status(400).json({ message: "teacherId required" });
   }
 
-  const teacher = teachers.find((t) => t.id === teacherId);
-  if (!teacher) {
+  const teacher = await query("select id from teachers where id = $1", [teacherId]);
+  if (!teacher.rowCount) {
     return res.status(404).json({ message: "Teacher not found" });
   }
 
-  const booking = {
-    id: `b${bookings.length + 1}`,
-    studentId: req.user.id,
-    teacherId,
-    note: note || "",
-    status: "pending",
-    createdAt: new Date().toISOString(),
-  };
+  const created = await query(
+    "insert into bookings (id, student_id, teacher_id, note, status, created_at) values ($1,$2,$3,$4,'pending',$5) returning id, student_id, teacher_id, note, status, created_at",
+    [createId("b"), req.user.id, teacherId, note || "", new Date().toISOString()]
+  );
 
-  bookings.push(booking);
-  return res.status(201).json(booking);
+  return res.status(201).json(mapBooking(created.rows[0]));
 }
 
-function updateBookingStatus(req, res) {
-  const booking = bookings.find((b) => b.id === req.params.id);
-  if (!booking) {
+async function updateBookingStatus(req, res) {
+  const bookingResult = await query("select id, teacher_id from bookings where id = $1", [req.params.id]);
+  if (!bookingResult.rowCount) {
     return res.status(404).json({ message: "Booking not found" });
   }
 
-  if (req.user.role !== "teacher" || booking.teacherId !== req.user.teacherId) {
+  const booking = bookingResult.rows[0];
+
+  if (req.user.role !== "teacher" || booking.teacher_id !== req.user.teacherId) {
     return res.status(403).json({ message: "Forbidden" });
   }
 
@@ -54,8 +69,11 @@ function updateBookingStatus(req, res) {
     return res.status(400).json({ message: "status must be accepted or rejected" });
   }
 
-  booking.status = status;
-  return res.json(booking);
+  const updated = await query(
+    "update bookings set status = $1 where id = $2 returning id, student_id, teacher_id, note, status, created_at",
+    [status, req.params.id]
+  );
+  return res.json(mapBooking(updated.rows[0]));
 }
 
 module.exports = {

@@ -1,5 +1,26 @@
-const { teachers, subjects, teacherApplications } = require("../data/mockData");
+const { query } = require("../config/db");
+const { createId } = require("../utils/id");
 const { haversineKm } = require("../utils/geo");
+
+function mapTeacher(row, reviews = []) {
+  return {
+    id: row.id,
+    name: row.name,
+    image: row.image,
+    subject: row.subject,
+    subjects: row.subjects || [],
+    rating: Number(row.rating || 0),
+    price: Number(row.price || 0),
+    location: row.location,
+    coordinates: {
+      lat: Number(row.lat || 0),
+      lng: Number(row.lng || 0),
+    },
+    experienceYears: Number(row.experience_years || 0),
+    bio: row.bio,
+    reviews,
+  };
+}
 
 function withDistance(item, lat, lng) {
   if (Number.isNaN(lat) || Number.isNaN(lng)) {
@@ -10,37 +31,44 @@ function withDistance(item, lat, lng) {
   return { ...item, distanceKm: Math.round(distanceKm * 10) / 10 };
 }
 
-function listTeachers(req, res) {
+async function listTeachers(req, res) {
   const { subject, minPrice, maxPrice, rating, location, lat, lng } = req.query;
 
   const parsedLat = Number(lat);
   const parsedLng = Number(lng);
 
-  let result = teachers.map((t) => withDistance(t, parsedLat, parsedLng));
+  const params = [];
+  const where = [];
 
   if (subject) {
-    const s = String(subject).toLowerCase();
-    result = result.filter(
-      (t) => t.subject.toLowerCase() === s || t.subjects.some((item) => item.toLowerCase() === s)
-    );
+    params.push(String(subject).toLowerCase());
+    where.push(`(lower(subject) = $${params.length} or exists (select 1 from unnest(subjects) s where lower(s) = $${params.length}))`);
   }
 
   if (location) {
-    const loc = String(location).toLowerCase();
-    result = result.filter((t) => t.location.toLowerCase().includes(loc));
+    params.push(`%${String(location).toLowerCase()}%`);
+    where.push(`lower(location) like $${params.length}`);
   }
 
   if (minPrice) {
-    result = result.filter((t) => t.price >= Number(minPrice));
+    params.push(Number(minPrice));
+    where.push(`price >= $${params.length}`);
   }
 
   if (maxPrice) {
-    result = result.filter((t) => t.price <= Number(maxPrice));
+    params.push(Number(maxPrice));
+    where.push(`price <= $${params.length}`);
   }
 
   if (rating) {
-    result = result.filter((t) => t.rating >= Number(rating));
+    params.push(Number(rating));
+    where.push(`rating >= $${params.length}`);
   }
+
+  const whereSql = where.length ? `where ${where.join(" and ")}` : "";
+  const teacherRows = await query(`select * from teachers ${whereSql}`, params);
+
+  let result = teacherRows.rows.map((row) => withDistance(mapTeacher(row), parsedLat, parsedLng));
 
   result.sort((a, b) => {
     if (a.distanceKm !== null && b.distanceKm !== null) {
@@ -52,32 +80,50 @@ function listTeachers(req, res) {
   return res.json({ items: result, total: result.length });
 }
 
-function getTopTeachers(req, res) {
-  const top = [...teachers].sort((a, b) => b.rating - a.rating).slice(0, 4);
+async function getTopTeachers(req, res) {
+  const topRows = await query("select * from teachers order by rating desc limit 4");
+  const top = topRows.rows.map((row) => mapTeacher(row));
   return res.json({ items: top });
 }
 
-function getTeacherById(req, res) {
-  const teacher = teachers.find((item) => item.id === req.params.id);
-  if (!teacher) {
+async function getTeacherById(req, res) {
+  const teacherResult = await query("select * from teachers where id = $1", [req.params.id]);
+  if (!teacherResult.rowCount) {
     return res.status(404).json({ message: "Teacher not found" });
   }
+
+  const reviewResult = await query(
+    "select id, user_name, comment, rating from reviews where teacher_id = $1 order by created_at desc",
+    [req.params.id]
+  );
+
+  const reviews = reviewResult.rows.map((row) => ({
+    id: row.id,
+    user: row.user_name,
+    comment: row.comment,
+    rating: Number(row.rating || 0),
+  }));
+
+  const teacher = mapTeacher(teacherResult.rows[0], reviews);
   return res.json(teacher);
 }
 
-function getPopularSubjects(req, res) {
-  return res.json({ items: subjects.slice(0, 6) });
+async function getPopularSubjects(req, res) {
+  const result = await query(
+    "select subject from teachers union select distinct unnest(subjects) as subject from teachers limit 8"
+  );
+  return res.json({ items: result.rows.map((row) => row.subject).filter(Boolean) });
 }
 
-function applyAsTeacher(req, res) {
+async function applyAsTeacher(req, res) {
   const { name, subjects: selectedSubjects, experience, price, location } = req.body;
 
   if (!name || !Array.isArray(selectedSubjects) || !selectedSubjects.length || !experience || !price || !location) {
-    return res.status(400).json({ message: "All fields are required" });
+    return res.status(400).json({ message: "Butun saheler teleb olunur" });
   }
 
   const application = {
-    id: `a${teacherApplications.length + 1}`,
+    id: createId("a"),
     name,
     subjects: selectedSubjects,
     experience,
@@ -86,8 +132,12 @@ function applyAsTeacher(req, res) {
     createdAt: new Date().toISOString(),
   };
 
-  teacherApplications.push(application);
-  return res.status(201).json({ message: "Application submitted", application });
+  await query(
+    "insert into teacher_applications (id, name, subjects, experience, price, location, created_at) values ($1,$2,$3,$4,$5,$6,$7)",
+    [application.id, name, selectedSubjects, Number(experience), Number(price), location, application.createdAt]
+  );
+
+  return res.status(201).json({ message: "Muraciet ugurla gonderildi", application });
 }
 
 module.exports = {

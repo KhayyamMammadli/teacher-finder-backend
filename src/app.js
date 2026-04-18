@@ -8,7 +8,11 @@ const profileRoutes = require('./routes/profileRoutes');
 
 const app = express();
 
-app.use(cors());
+const corsOrigin = process.env.CORS_ORIGIN || '*';
+
+app.use(cors({
+  origin: corsOrigin,
+}));
 app.use(express.json());
 
 app.get('/', (req, res) => {
