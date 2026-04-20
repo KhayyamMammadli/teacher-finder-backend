@@ -7,11 +7,14 @@ function mapProfile(row) {
     name: row.name,
     email: row.email,
     phone: row.phone,
+    authProvider: row.auth_provider || null,
+    instagramUsername: row.instagram_username || null,
+    profileImageUrl: row.profile_image_url || null,
   };
 }
 
 async function getMyProfile(req, res) {
-  const result = await query("select id, role, name, email, phone from users where id = $1", [
+  const result = await query("select id, role, name, email, phone, auth_provider, instagram_username, profile_image_url from users where id = $1", [
     req.user.id,
   ]);
 
@@ -23,7 +26,7 @@ async function getMyProfile(req, res) {
 }
 
 async function updateMyProfile(req, res) {
-  const existing = await query("select id, role, name, email, phone from users where id = $1", [
+  const existing = await query("select id, role, name, email, phone, auth_provider, instagram_username, profile_image_url from users where id = $1", [
     req.user.id,
   ]);
 
@@ -35,7 +38,7 @@ async function updateMyProfile(req, res) {
   const { name, phone } = req.body;
 
   const updated = await query(
-    "update users set name = $1, phone = $2 where id = $3 returning id, role, name, email, phone",
+    "update users set name = $1, phone = $2 where id = $3 returning id, role, name, email, phone, auth_provider, instagram_username, profile_image_url",
     [
       typeof name === "string" && name.trim() ? name.trim() : current.name,
       typeof phone === "string" ? phone.trim() : current.phone,

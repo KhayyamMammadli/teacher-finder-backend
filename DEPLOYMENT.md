@@ -31,12 +31,12 @@ PORT=5050
 JWT_SECRET=strong-random-secret
 JWT_EXPIRES_IN=7d
 DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@[YOUR-SUPABASE-HOST]:5432/postgres?sslmode=require
-CORS_ORIGIN=https://your-teacher-finder-web.onrender.com,https://your-teacher-finder-admin.onrender.com
+CORS_ORIGIN=https://your-azstore-web.onrender.com,https://your-azstore-admin.onrender.com
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=example@gmail.com
 SMTP_PASS=app-password
-SMTP_FROM=TeacherFinder <no-reply@teacherfinder.az>
+SMTP_FROM=AzStore <no-reply@azstore.az>
 ```
 
 Notes:
@@ -58,16 +58,16 @@ Recommended:
 Environment variables:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=https://your-teacher-finder-api.onrender.com
-NEXT_PUBLIC_SITE_URL=https://your-teacher-finder-web.onrender.com
+NEXT_PUBLIC_API_BASE_URL=https://your-azstore-api.onrender.com
+NEXT_PUBLIC_SITE_URL=https://your-azstore-web.onrender.com
 ```
 
 ## 4. Smoke test
 
 Deploy bitenden sonra bunlari yoxla:
 
-- `https://your-teacher-finder-api.onrender.com/`
-- `https://your-teacher-finder-api.onrender.com/health`
+- `https://your-azstore-api.onrender.com/`
+- `https://your-azstore-api.onrender.com/health`
 - frontend-de qeydiyyat OTP sorghusu
 
 ## 5. Common failures

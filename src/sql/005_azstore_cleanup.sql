@@ -18,7 +18,7 @@ begin
   end loop;
 end $$;
 
--- Normalize legacy roles from old TeacherFinder platform.
+-- Normalize legacy roles from the old platform.
 update users set role = 'shop_owner' where role = 'teacher';
 update users set role = 'customer' where role = 'student';
 
@@ -28,7 +28,7 @@ alter table users add constraint users_role_check
 -- Teacher-specific column is no longer used by AzStore.
 alter table users drop column if exists teacher_id;
 
--- Remove legacy TeacherFinder tables if they still exist.
+-- Remove legacy platform tables if they still exist.
 drop table if exists bookings cascade;
 drop table if exists reviews cascade;
 drop table if exists teacher_applications cascade;

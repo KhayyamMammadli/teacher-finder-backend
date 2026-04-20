@@ -105,13 +105,18 @@ async function createShop(req, res) {
     return res.status(409).json({ message: "Sizdə artıq bir mağaza var" });
   }
 
+  const userResult = await query("select instagram_username from users where id = $1", [req.user.id]);
+  const fallbackInstagramUrl = userResult.rows[0]?.instagram_username
+    ? `https://instagram.com/${userResult.rows[0].instagram_username}`
+    : null;
+
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + Date.now().toString(36);
   const id = createId("shop");
 
   await query(
     `insert into shops (id, owner_id, name, slug, description, category, instagram_url, whatsapp, logo_url, cover_url, location, delivery_info)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-    [id, req.user.id, name, slug, description || null, category, instagramUrl || null, whatsapp || null, logoUrl || null, coverUrl || null, location || null, deliveryInfo || null]
+    [id, req.user.id, name, slug, description || null, category, instagramUrl || fallbackInstagramUrl, whatsapp || null, logoUrl || null, coverUrl || null, location || null, deliveryInfo || null]
   );
 
   await query("update users set role = 'shop_owner' where id = $1", [req.user.id]);
