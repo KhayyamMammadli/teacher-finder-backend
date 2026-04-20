@@ -19,7 +19,6 @@ function toAuthResponse(user) {
       name: user.name,
       email: user.email,
       phone: user.phone,
-      teacherId: user.teacher_id,
     },
   };
 }
@@ -57,14 +56,10 @@ async function sendRegisterOtp(req, res) {
 }
 
 async function verifyRegisterOtp(req, res) {
-  const { name, email, password, role = "customer", phone, otp } = req.body;
+  const { name, email, password, phone, otp } = req.body;
 
   if (!name || !email || !password || !otp) {
     return res.status(400).json({ message: "Ad, email, sifre ve OTP teleb olunur" });
-  }
-
-  if (!["customer", "shop_owner"].includes(role)) {
-    return res.status(400).json({ message: "Rol customer ve ya shop_owner olmalidir" });
   }
 
   const normalizedEmail = String(email).trim().toLowerCase();
@@ -91,25 +86,12 @@ async function verifyRegisterOtp(req, res) {
     return res.status(400).json({ message: "OTP yanlisdir" });
   }
 
-  if (role === "shop_owner") {
-    const passwordHash = await bcrypt.hash(password, 10);
-    const id = createId("u");
-
-    const userInsert = await query(
-      "insert into users (id, role, teacher_id, name, email, password_hash, phone) values ($1,'shop_owner',$2,$3,$4,$5,$6) returning id, role, teacher_id, name, email, phone",
-      [id, null, name, normalizedEmail, passwordHash, phone || ""]
-    );
-
-    await query("update email_otps set consumed = true where id = $1", [otpRow.id]);
-    return res.status(201).json(toAuthResponse(userInsert.rows[0]));
-  }
-
   const passwordHash = await bcrypt.hash(password, 10);
   const id = createId("u");
 
   const userInsert = await query(
-    "insert into users (id, role, teacher_id, name, email, password_hash, phone) values ($1,$2,$3,$4,$5,$6,$7) returning id, role, teacher_id, name, email, phone",
-    [id, role, null, name, normalizedEmail, passwordHash, phone || ""]
+    "insert into users (id, role, name, email, password_hash, phone) values ($1,'shop_owner',$2,$3,$4,$5) returning id, role, name, email, phone",
+    [id, name, normalizedEmail, passwordHash, phone || ""]
   );
 
   await query("update email_otps set consumed = true where id = $1", [otpRow.id]);

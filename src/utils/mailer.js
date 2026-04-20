@@ -46,20 +46,20 @@ async function sendMail({ to, subject, text, html }) {
 async function sendOtpMail({ to, otpCode }) {
   return sendMail({
     to,
-    subject: "TeacherFinder qeydiyyat OTP kodu",
+    subject: "AzStore qeydiyyat OTP kodu",
     text: `Sizin OTP kodunuz: ${otpCode}. Kod 10 deqiqe aktivdir.`,
     html: `<p>Sizin OTP kodunuz: <b>${otpCode}</b></p><p>Kod 10 deqiqe aktivdir.</p>`,
   });
 }
 
 async function sendTeacherApprovalMail({ to, name }) {
-  const loginUrl = process.env.WEB_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://teacher-finder-web.onrender.com/login";
+  const loginUrl = process.env.WEB_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://your-azstore-web.onrender.com/login";
 
   return sendMail({
     to,
-    subject: "TeacherFinder muellim qeydiyyatiniz tesdiqlendi",
-    text: `Salam ${name}, muellim qeydiyyatiniz admin terefinden tesdiqlendi. Artıq platformaya daxil ola bilersiniz: ${loginUrl}`,
-    html: `<p>Salam <b>${name}</b>,</p><p>Muellim qeydiyyatiniz admin terefinden tesdiqlendi.</p><p>Artıq platformaya daxil ola bilersiniz: <a href="${loginUrl}">${loginUrl}</a></p>`,
+    subject: "AzStore hesabiniz aktivdir",
+    text: `Salam ${name}, hesabiniz aktivdir. Platformaya daxil ola bilersiniz: ${loginUrl}`,
+    html: `<p>Salam <b>${name}</b>,</p><p>Hesabiniz aktivdir.</p><p>Platformaya daxil ola bilersiniz: <a href="${loginUrl}">${loginUrl}</a></p>`,
   });
 }
 

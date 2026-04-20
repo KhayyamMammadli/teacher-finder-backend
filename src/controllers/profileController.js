@@ -7,12 +7,11 @@ function mapProfile(row) {
     name: row.name,
     email: row.email,
     phone: row.phone,
-    teacherId: row.teacher_id,
   };
 }
 
 async function getMyProfile(req, res) {
-  const result = await query("select id, role, name, email, phone, teacher_id from users where id = $1", [
+  const result = await query("select id, role, name, email, phone from users where id = $1", [
     req.user.id,
   ]);
 
@@ -24,7 +23,7 @@ async function getMyProfile(req, res) {
 }
 
 async function updateMyProfile(req, res) {
-  const existing = await query("select id, role, name, email, phone, teacher_id from users where id = $1", [
+  const existing = await query("select id, role, name, email, phone from users where id = $1", [
     req.user.id,
   ]);
 
@@ -36,7 +35,7 @@ async function updateMyProfile(req, res) {
   const { name, phone } = req.body;
 
   const updated = await query(
-    "update users set name = $1, phone = $2 where id = $3 returning id, role, name, email, phone, teacher_id",
+    "update users set name = $1, phone = $2 where id = $3 returning id, role, name, email, phone",
     [
       typeof name === "string" && name.trim() ? name.trim() : current.name,
       typeof phone === "string" ? phone.trim() : current.phone,

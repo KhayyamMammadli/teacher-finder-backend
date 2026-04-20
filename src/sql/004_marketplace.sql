@@ -1,13 +1,29 @@
 -- Azerbaijan Instagram Marketplace - core tables
 
--- Update users role constraint to support shop_owner
-alter table users drop constraint if exists users_role_check;
-alter table users add constraint users_role_check
-  check (role in ('customer','shop_owner','admin'));
+begin;
+
+-- Drop legacy role-related check constraints first to prevent update failures.
+do $$
+declare c record;
+begin
+  for c in
+    select conname
+    from pg_constraint
+    where conrelid = 'users'::regclass
+      and contype = 'c'
+      and pg_get_constraintdef(oid) ilike '%role%'
+  loop
+    execute format('alter table users drop constraint if exists %I', c.conname);
+  end loop;
+end $$;
 
 -- Update existing role values
 update users set role = 'customer' where role = 'student';
 update users set role = 'shop_owner' where role = 'teacher';
+
+-- Update users role constraint to support shop_owner
+alter table users add constraint users_role_check
+  check (role in ('customer','shop_owner','admin'));
 
 -- Shops table
 create table if not exists shops (
@@ -67,3 +83,5 @@ create table if not exists orders (
 
 create index if not exists idx_orders_shop on orders (shop_id, created_at desc);
 create index if not exists idx_orders_status on orders (shop_id, status);
+
+commit;

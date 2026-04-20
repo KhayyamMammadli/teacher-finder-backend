@@ -12,7 +12,7 @@ async function authRequired(req, res, next) {
 
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    const userResult = await query("select id, role, teacher_id from users where id = $1", [payload.sub]);
+    const userResult = await query("select id, role from users where id = $1", [payload.sub]);
     const user = userResult.rows[0];
 
     if (!user) {
@@ -22,7 +22,6 @@ async function authRequired(req, res, next) {
     req.user = {
       id: user.id,
       role: user.role,
-      teacherId: user.teacher_id,
     };
 
     return next();
