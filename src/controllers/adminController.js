@@ -1,6 +1,7 @@
 const { pool, query } = require("../config/db");
 const { createId } = require("../utils/id");
 const { ensureTeacherRegistrationTable } = require("../utils/teacherRegistration");
+const { sendTeacherApprovalMail } = require("../utils/mailer");
 
 function toRequestDto(row) {
   return {
@@ -409,8 +410,22 @@ async function approveTeacherRegistrationRequest(req, res) {
 
     await client.query("commit");
 
+    let mailWarning = null;
+    try {
+      await sendTeacherApprovalMail({
+        to: String(registrationRequest.email).toLowerCase(),
+        name: registrationRequest.name,
+      });
+    } catch (err) {
+      mailWarning = err.message;
+      console.error("[mail] Teacher approval email could not be sent:", err.message);
+    }
+
     return res.json({
-      message: "Muellim muracieti tesdiqlendi",
+      message: mailWarning
+        ? "Muellim muracieti tesdiqlendi, amma bildiris emaili gonderilmedi"
+        : "Muellim muracieti tesdiqlendi ve bildiris emaili gonderildi",
+      mailWarning,
       user: userInsert.rows[0],
     });
   } catch (err) {
