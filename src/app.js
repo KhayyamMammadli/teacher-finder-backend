@@ -3,8 +3,8 @@ const cors = require('cors');
 require('dotenv').config();
 const { query } = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
-const teacherRoutes = require('./routes/teacherRoutes');
-const bookingRoutes = require('./routes/bookingRoutes');
+const shopRoutes = require('./routes/shopRoutes');
+const orderRoutes = require('./routes/orderRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 
@@ -40,8 +40,8 @@ app.use(express.json());
 
 app.get('/', (req, res) => {
   res.json({
-    message: 'Teacher Finder API works',
-    version: '1.0.0',
+    message: 'AzStore Marketplace API works',
+    version: '2.0.0',
   });
 });
 
@@ -59,8 +59,8 @@ app.get('/health', async (req, res, next) => {
 });
 
 app.use('/api/auth', authRoutes);
-app.use('/api/teachers', teacherRoutes);
-app.use('/api/bookings', bookingRoutes);
+app.use('/api/shops', shopRoutes);
+app.use('/api/orders', orderRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/admin', adminRoutes);
 
